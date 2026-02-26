@@ -4,7 +4,6 @@ import discord
 from discord.ext import commands
 import emoji
 
-# 從雲端環境變數讀取 Token
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not TOKEN:
@@ -15,29 +14,44 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
-    try:
-        synced = await bot.tree.sync()
-        print(f"已同步 {len(synced)} 個指令：{[c.name for c in synced]}")
-    except Exception as e:
-        print("同步失敗：", repr(e))
+    synced = await bot.tree.sync()
+    print(f"已同步 {len(synced)} 個指令")
     print("機器人已上線")
 
 @bot.tree.command(name="占卜", description="打開垃圾桶看看裡面有什麼")
 async def divination(interaction: discord.Interaction):
 
-    # 抓所有 Unicode emoji
-    all_emojis = list(emoji.EMOJI_DATA.keys())
+    allowed_groups = {
+        "Smileys & Emotion",   # 表情 / 臉
+        "People & Body",       # 手勢 / 身體部位
+        "Animals & Nature",    # 自然
+        "Food & Drink",        # 食物
+        "Activities",          # 活動
+        "Objects",             # 物品
+        "Symbols"              # 符號
+    }
 
-    # 排除人類相關
     filtered = []
-    for e in all_emojis:
-        name = emoji.EMOJI_DATA[e]["en"]
-        if any(word in name for word in [
-            "person", "man", "woman", "boy", "girl",
-            "family", "skin tone"
-        ]):
-            continue
-        filtered.append(e)
+
+    for e, data in emoji.EMOJI_DATA.items():
+        group = data.get("group")
+
+        # 只保留你指定的分類
+        if group in allowed_groups:
+
+            name = data.get("en", "")
+
+            # 排除單人、職業、家庭、角色
+            if any(word in name for word in [
+                "man", "woman", "person",
+                "boy", "girl", "family",
+                "pregnant", "bride", "groom",
+                "vampire", "mage", "elf",
+                "fairy", "zombie"
+            ]):
+                continue
+
+            filtered.append(e)
 
     pick = random.choice(filtered)
 
