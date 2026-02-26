@@ -42,20 +42,37 @@ async def divination(interaction: discord.Interaction):
         "Objects",             # 物品
     }
 
+    def is_flag_emoji(ch: str) -> bool:
+        # 1) 由兩個 Regional Indicator 組成的國旗（🇹🇼 這種）
+        cps = [ord(c) for c in ch]
+        regional = [cp for cp in cps if 0x1F1E6 <= cp <= 0x1F1FF]
+        if len(regional) >= 2:
+            return True
+
+        # 2) Tag sequence flags（🏴 這種，像英格蘭/蘇格蘭/威爾斯）
+        if cps and cps[0] == 0x1F3F4:
+            return True
+
+        return False
+
     for e, data in emoji.EMOJI_DATA.items():
-        group = data.get("group") or ""
+        # 你裝的 emoji 版本可能沒有 group/category，所以要做 fallback
+        group = data.get("group") or data.get("category")  # 可能是 None
         name = (data.get("en") or "").lower()
 
-        # 只允許指定分類
-        if group not in allowed_groups:
+        # ✅ 若 group/category 存在才做分類限制；不存在就不靠分類過濾（避免全清空）
+        if group and group not in allowed_groups:
             continue
 
-        # 保險：排除所有旗幟
-        if "flag" in name:
+        # ✅ 國旗：兩層保險
+        if is_flag_emoji(e):
+            continue
+        # 有些版本 name 會是 "flag: ..." 或 demojize 才看得出來
+        if "flag" in name or emoji.demojize(e).lower().startswith(":flag_"):
             continue
 
         # 排除完整人物（但保留手勢 / 身體部位）
-        if group == "People & Body":
+        if group == "People & Body" or (not group):  # 沒 group 時也照樣用關鍵字擋人類
             if any(word in name for word in [
                 "man", "woman", "boy", "girl", "person",
                 "people", "family", "pregnant",
@@ -67,7 +84,9 @@ async def divination(interaction: discord.Interaction):
         filtered.append(e)
 
     if not filtered:
-        await interaction.response.send_message("沒有可用 emoji，請檢查分類設定。")
+        await interaction.response.send_message(
+            "沒有可用 emoji（可能是 emoji 套件版本沒有 group/category，或過濾太嚴格）。"
+        )
         return
 
     pick = random.choice(filtered)
